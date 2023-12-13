@@ -27,45 +27,9 @@ class Player:
         self.rect = pygame.Rect(x, y, size, size)
 
 class Enemy:
-    MOVING = 'm'
-    SHOW = 's'
-    HIDDEN = 'h'
-
     def __init__(self, x, y, size, speed):
         self.rect = pygame.Rect(x, y, size, size)
-        self.speed = speed
-        self.fsm = FSM(self.SHOW)
-        self.init_fsm()
-
-    def init_fsm(self):
-        self.fsm.add_transition('start_moving_event', self.SHOW, self.move, self.MOVING)
-        self.fsm.add_transition('find_parents_event', self.MOVING, self.hide, self.HIDDEN)
-        self.fsm.add_transition('next_level_event', self.HIDDEN, self.show, self.SHOW)
-
-    def move(self):
-        # Remove vibrating feature
-        pass
-
-    def move_random(self):
-        random_direction = random.choice(["up", "down", "left", "right"])
-        random_speed = random.uniform(0.1, 0.5)
-
-        if random_direction == "up" and self.rect.top > 0:
-            self.speed = [0, -random_speed]
-        elif random_direction == "down" and self.rect.bottom < height:
-            self.speed = [0, random_speed]
-        elif random_direction == "left" and self.rect.left > 0:
-            self.speed = [-random_speed, 0]
-        elif random_direction == "right" and self.rect.right < width:
-            self.speed = [random_speed, 0]
-
-    def hide(self):
-        self.rect.x = -100
-        self.rect.y = -100
-
-    def show(self):
-        self.rect.x = random.randint(0, width - self.rect.width)
-        self.rect.y = random.randint(0, height - self.rect.height)
+        self.fsm = FSM(initial_state='h')  # 'h' represents the hidden state
 
 # Initialize Pygame
 pygame.init()
@@ -75,19 +39,26 @@ width, height = 800, 600
 screen = pygame.display.set_mode((width, height))
 pygame.display.set_caption("Mall Game")
 
+# Load and resize the image for the background
+background_image = pygame.image.load("mall.png")
+background_image = pygame.transform.scale(background_image, (width, height))
+
 # Colors
 white = (255, 255, 255)
 red = (255, 0, 0)
-blue = (0, 0, 255)
 
 # Player variables
-player_size = 30
 player_pos = [0, 0]  # User starts in the top-left corner
 
-# Create player object
-player = Player(player_pos[0], player_pos[1], player_size)
+# Load and resize the image for the player (blue rectangle)
+kid_image = pygame.image.load("kid.png")
+kid_size = 50  # Change the size to make the image bigger
+kid_image = pygame.transform.scale(kid_image, (kid_size, kid_size))
 
-# Load and resize the image
+# Create player object
+player = Player(player_pos[0], player_pos[1], kid_size)
+
+# Load and resize the image for the parent
 parent_image = pygame.image.load("parent.png")
 parent_size = 60
 parent_image = pygame.transform.scale(parent_image, (parent_size, parent_size))
@@ -100,6 +71,13 @@ obstacle_image = pygame.transform.scale(obstacle_image, (obstacle_size, obstacle
 
 # Font for the "You Win!" and "Game Over" screens
 font = pygame.font.Font(None, 36)
+big_font = pygame.font.Font(None, 72)
+
+# Game loop
+clock = pygame.time.Clock()
+win_screen_duration = 5000  # 5 seconds
+win_screen_timer = 0
+win = False
 
 # Initialize levels
 levels = [
@@ -137,13 +115,16 @@ def setup_level(level):
 
 obstacles, enemies_random, enemies_left_to_right = setup_level(levels[current_level])
 
-# Flag to track if the parent image is currently visible
+# Parent visibility settings
 parent_visible = True
-parent_disappear_timer = 0
-parent_disappear_duration = 3000  # Disappear for 3 seconds
-parent_appear_duration = 5000  # Appear for 5 seconds
+parent_disappear_timer = pygame.time.get_ticks()
+parent_disappear_duration = 3000  # 3 seconds
+parent_appear_duration = 5000  # 5 seconds
 
-# Game loop
+# Variables for tracking time until parents found
+start_time = pygame.time.get_ticks()
+time_until_found = 0
+
 while True:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -153,6 +134,7 @@ while True:
     keys = pygame.key.get_pressed()
     player_speed = 5
 
+    # Player movement
     if keys[pygame.K_LEFT] and player.rect.left > 0:
         player.rect.x -= player_speed
     if keys[pygame.K_RIGHT] and player.rect.right < width:
@@ -162,6 +144,7 @@ while True:
     if keys[pygame.K_DOWN] and player.rect.bottom < height:
         player.rect.y += player_speed
 
+    # Process enemies
     for enemy in enemies_random:
         enemy.fsm.process('start_moving_event')
 
@@ -171,9 +154,84 @@ while True:
     # Check for collisions
     for obstacle in obstacles + [enemy.rect for enemy in enemies_random] + [enemy.rect for enemy in enemies_left_to_right]:
         if player.rect.colliderect(obstacle):
-            print("Game Over!")
+            # Display "Game Over" on a white screen with level information
+            screen.fill(white)
+            game_over_text = big_font.render("Game Over", True, red)
+            game_over_rect = game_over_text.get_rect(center=(width // 2, height // 3))
+            screen.blit(game_over_text, game_over_rect.topleft)
+
+            # Calculate and display time until parents found
+            time_until_found = (pygame.time.get_ticks() - start_time) // 1000
+            time_text = font.render(f"Time until parents found: {time_until_found} seconds", True, red)
+            time_rect = time_text.get_rect(center=(width // 2, height // 2))
+            screen.blit(time_text, time_rect.topleft)
+
+            level_text = font.render(f"Levels Passed: {current_level}", True, red)
+            level_rect = level_text.get_rect(center=(width // 2, height // 1.5))
+            screen.blit(level_text, level_rect.topleft)
+
+            # Display "Thank you for playing Mall Game" in smaller black font
+            thank_you_text = pygame.font.Font(None, 24).render("Thank you for playing Mall Game", True, (0, 0, 0))
+            thank_you_rect = thank_you_text.get_rect(center=(width // 2, height // 1.2))
+            screen.blit(thank_you_text, thank_you_rect.topleft)
+
+            pygame.display.flip()
+
+            # Wait for a brief period before quitting
+            pygame.time.delay(5000)
             pygame.quit()
             sys.exit()
+
+    # Check if the blue rectangle collides with the parent image
+    if player.rect.colliderect(parent_rect) and parent_visible:
+        win = True
+        win_screen_timer = pygame.time.get_ticks()
+
+        fsm_event = 'find_parents_event'
+        for enemy in enemies_random:
+            enemy.fsm.process(fsm_event)
+
+        for enemy in enemies_left_to_right:
+            enemy.fsm.process(fsm_event)
+
+        # Move to the next level if all enemies are hidden
+        if all(enemy.fsm.current_state == 'h' for enemy in enemies_random + enemies_left_to_right):
+            current_level += 1
+            if current_level < len(levels):
+                obstacles, enemies_random, enemies_left_to_right = setup_level(levels[current_level])
+                win = False
+                parent_visible = True
+                parent_rect.center = (random.randint(0, width - parent_size), random.randint(0, height - parent_size))
+                player.rect.topleft = (0, 0)  # Reset player position to the top-left corner
+                start_time = pygame.time.get_ticks()  # Reset time until parents found
+            else:
+                # Display "Game Over" on a white screen with level information
+                screen.fill(white)
+                game_over_text = big_font.render("Game Over", True, red)
+                game_over_rect = game_over_text.get_rect(center=(width // 2, height // 3))
+                screen.blit(game_over_text, game_over_rect.topleft)
+
+                # Calculate and display time until parents found
+                time_until_found = (pygame.time.get_ticks() - start_time) // 1000
+                time_text = font.render(f"Time until parents found: {time_until_found} seconds", True, red)
+                time_rect = time_text.get_rect(center=(width // 2, height // 2))
+                screen.blit(time_text, time_rect.topleft)
+
+                level_text = font.render(f"Levels Passed: {current_level}", True, red)
+                level_rect = level_text.get_rect(center=(width // 2, height // 1.5))
+                screen.blit(level_text, level_rect.topleft)
+
+                # Display "Thank you for playing Mall Game" in smaller black font
+                thank_you_text = pygame.font.Font(None, 24).render("Thank you for playing Mall Game", True, (0, 0, 0))
+                thank_you_rect = thank_you_text.get_rect(center=(width // 2, height // 1.2))
+                screen.blit(thank_you_text, thank_you_rect.topleft)
+
+                pygame.display.flip()
+
+                # Wait for a brief period before quitting
+                pygame.time.delay(5000)
+                pygame.quit()
+                sys.exit()
 
     # Check if it's time to toggle the visibility of the parent image
     current_time = pygame.time.get_ticks()
@@ -184,7 +242,8 @@ while True:
         parent_visible = False
         parent_disappear_timer = current_time
 
-    screen.fill(white)
+    # Draw the background image
+    screen.blit(background_image, (0, 0))
 
     for obstacle in obstacles:
         screen.blit(obstacle_image, obstacle.topleft)
@@ -193,7 +252,8 @@ while True:
     if parent_visible:
         screen.blit(parent_image, parent_rect.topleft)
 
-    pygame.draw.rect(screen, blue, player.rect)
+    # Render the kid image instead of the blue rectangle
+    screen.blit(kid_image, player.rect.topleft)
 
     for enemy in enemies_random + enemies_left_to_right:
         screen.blit(obstacle_image, enemy.rect.topleft)
