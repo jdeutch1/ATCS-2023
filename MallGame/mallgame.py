@@ -1,10 +1,16 @@
+"""
+ATCS Final Project
+By Jackson Deutch
+With assistance from CHATGPT
+Dec 16, 2023
+"""
+
 import pygame
 import sys
 import random
 
 class FSM:
     def __init__(self, initial_state):
-        # Dictionary (input_symbol, current_state) --> (action, next_state).
         self.state_transitions = {}
         self.current_state = initial_state
 
@@ -22,14 +28,30 @@ class FSM:
         if next_state is not None:
             self.current_state = next_state
 
+# AI-generated code
 class Player:
     def __init__(self, x, y, size):
         self.rect = pygame.Rect(x, y, size, size)
 
+# Student and AI-generated
 class Enemy:
+    HIDDEN, SHOWING = "h", "s"
+
     def __init__(self, x, y, size, speed):
         self.rect = pygame.Rect(x, y, size, size)
-        self.fsm = FSM(initial_state='h')  # 'h' represents the hidden state
+        self.fsm = FSM(initial_state=self.HIDDEN)
+        self.init_fsm()
+
+    def init_fsm(self):
+        def show_enemy():
+            self.rect.x = random.randint(0, width - obstacle_size)
+            self.rect.y = random.randint(0, height - obstacle_size)
+
+        def next_level():
+            self.fsm.current_state = self.HIDDEN
+
+        self.fsm.add_transition("level_over", self.SHOWING, next_level)
+        self.fsm.add_transition("new_level_start", self.HIDDEN, show_enemy, self.SHOWING)
 
 # Initialize Pygame
 pygame.init()
@@ -46,6 +68,8 @@ background_image = pygame.transform.scale(background_image, (width, height))
 # Colors
 white = (255, 255, 255)
 red = (255, 0, 0)
+
+# AI GENERATED CODE BELOW
 
 # Player variables
 player_pos = [0, 0]  # User starts in the top-left corner
@@ -247,7 +271,6 @@ while True:
 
     for obstacle in obstacles:
         screen.blit(obstacle_image, obstacle.topleft)
-
     # Display the parent image only if it's currently visible
     if parent_visible:
         screen.blit(parent_image, parent_rect.topleft)
